@@ -12,28 +12,31 @@ bool inBorder(const cv::Point2f &pt)
     return BORDER_SIZE <= img_x && img_x < COL - BORDER_SIZE && BORDER_SIZE <= img_y && img_y < ROW - BORDER_SIZE;
 }
 
-//去除无法追踪的特征
+//去除无法追踪的特征 输入特征点的状态标识数组
 void reduceVector(vector<cv::Point2f> &v, vector<uchar> status)
 {
     int j = 0;
     for (int i = 0; i < int(v.size()); i++)
-        if (status[i])
+        if (status[i]) // 特征点状态良好
             v[j++] = v[i];//j++表示先取出j的值，再加1
+            // j为剩余 状态良好的 特征点数量
     v.resize(j);
 }
 
-//去除无法追踪到的特征点
+//去除无法追踪到的特征点 特征点id数组 ；特征点的状态标识数组
 void reduceVector(vector<int> &v, vector<uchar> status)
 {
     int j = 0;
     for (int i = 0; i < int(v.size()); i++)
-        if (status[i])
-            v[j++] = v[i];
+        if (status[i])    // 特征点状态良好
+            v[j++] = v[i];//j++表示先取出j的值，再加1
+            // j为剩余 状态良好的 特征点数量
     v.resize(j);
 }
 
 //构造函数实际上是空的，什么都没做
 //我就很纳闷，为什么不在构造函数内初始化成员数据
+// 应当以 初始化列表的方式初始化 成员数据!!!!!!!!!!!!
 FeatureTracker::FeatureTracker()
 {
 }
@@ -43,23 +46,26 @@ FeatureTracker::FeatureTracker()
 void FeatureTracker::setMask()
 {
     if(FISHEYE)
-        mask = fisheye_mask.clone();
+        mask = fisheye_mask.clone();// 鱼眼mask
     else
         mask = cv::Mat(ROW, COL, CV_8UC1, cv::Scalar(255));
     
 
     // prefer to keep features that are tracked for long time
 
-    //（cnt, pts, id）序列
+    //（cnt, pts, id）序列 追踪的次数:2d特征点:特征点id
     vector<pair<int, pair<cv::Point2f, int>>> cnt_pts_id;
     for (unsigned int i = 0; i < forw_pts.size(); i++)
         cnt_pts_id.push_back(make_pair(track_cnt[i], make_pair(forw_pts[i], ids[i])));
 
     //对光流跟踪到的特征点forw_pts，按照被跟踪到的次数从大到小排序
-    sort(cnt_pts_id.begin(), cnt_pts_id.end(), [](const pair<int, pair<cv::Point2f, int>> &a, const pair<int, pair<cv::Point2f, int>> &b)
+    sort(cnt_pts_id.begin(), cnt_pts_id.end(), 
+         // 匿名函数 实现 两元素比较大小
+         [](const pair<int, pair<cv::Point2f, int>> &a, const pair<int, pair<cv::Point2f, int>> &b)
          {
             return a.first > b.first;
-         });
+         }
+        );
 
     //清空容器forw_pts，ids，track_cnt
     forw_pts.clear();
@@ -69,6 +75,7 @@ void FeatureTracker::setMask()
     //遍历cnt_pts_id
     for (auto &it : cnt_pts_id)
     {
+     // 按照mask 过滤保留合适的 特征点
         if (mask.at<uchar>(it.second.first) == 255)
         {
             //当前特征点位置对应的mask值为255，则保留当前特征点，将对应的特征点位置，id，被追踪次数分别存入forw_pts, ids, track_cnt
